@@ -4,7 +4,7 @@
 
 ## Версия
 
-v0.1.0-alpha (Sprint 2 — Core)
+v0.1.0-alpha (Sprint 2 — Core + Structure)
 
 ## Возможности Sprint 1 + Sprint 2 Core
 
@@ -105,14 +105,6 @@ feature info
 | `feature profile export <name> <path>` | Экспортировать профиль |
 | `feature profile import <path>` | Импортировать профиль |
 
-## Профили
-
-В конфигурации можно создавать профили с разными настройками:
-
-- **default** — сбалансированные настройки
-- **expert** — максимальная точность и детализация
-- **fast** — максимальная скорость импорта
-
 ## Структура проекта
 
 ```
@@ -129,22 +121,36 @@ tpg-FaceEngine/
 │   │   ├── plugin.py             # PluginManager
 │   │   ├── history.py            # HistoryManager
 │   │   └── decision.py           # DecisionEngine
-│   ├── database/
+│   ├── desktop/
+│   │   ├── __init__.py
+│   │   ├── main_window.py        # Main window
+│   │   └── panels/
+│   │       ├── __init__.py
+│   │       ├── candidate_panel.py
+│   │       ├── history_panel.py
+│   │       ├── profile_panel.py
+│   │       ├── settings.py
+│   │       └── workspace_panel.py
+│   ├── recognition/
+│   │   ├── __init__.py
+│   │   └── engine.py             # InsightFace движок
+│   ├── search/
+│   │   ├── __init__.py
+│   │   └── index.py              # Faiss индекс
+│   ├── storage/
 │   │   ├── __init__.py
 │   │   ├── database.py           # DatabaseManager
 │   │   ├── logger.py             # Loguru
 │   │   └── models.py             # SQLAlchemy модели
-│   ├── faiss/
-│   │   ├── __init__.py
-│   │   └── index.py              # Faiss индекс
-│   ├── gui/
-│   │   └── __init__.py           # Зарезервировано для Sprint 3
 │   ├── import_/
 │   │   ├── __init__.py
 │   │   └── importer.py           # Импорт фотографий
-│   └── recognition/
-│       ├── __init__.py
-│       └── engine.py             # InsightFace движок
+│   ├── plugins/
+│   │   └── __init__.py           # Зарезервировано для плагинов
+│   ├── studio/
+│   │   └── __init__.py           # Зарезервировано для Studio
+│   └── labs/
+│       └── __init__.py           # Зарезервировано для Labs
 ├── alembic/
 │   ├── env.py
 │   ├── script.py.mako
@@ -168,8 +174,14 @@ tpg-FaceEngine/
 │   ├── test_decision.py
 │   └── test_history.py
 └── docs/
-    └── ARCHITECTURE.md
+    ├── ARCHITECTURE.md
+    └── OPERATOR_WORKFLOW.md
 ```
+
+## Документация
+
+- `docs/ARCHITECTURE.md` — архитектура проекта
+- `docs/OPERATOR_WORKFLOW.md` — сценарий работы оператора
 
 ## Запуск тестов
 

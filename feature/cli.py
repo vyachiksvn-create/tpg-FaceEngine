@@ -9,9 +9,9 @@ from loguru import logger
 
 from feature.config import AppConfig, ConfigManager
 from feature.core import EventBus, WorkspaceManager, ProfileManager
-from feature.database.database import DatabaseManager
-from feature.database.logger import setup_logger
-from feature.database.models import Embedding, Identity, Photo
+from feature.storage.database import DatabaseManager
+from feature.storage.logger import setup_logger
+from feature.storage.models import Embedding, Identity, Photo
 from feature.import_.importer import PhotoImporter
 from feature.recognition.engine import RecognitionEngine
 

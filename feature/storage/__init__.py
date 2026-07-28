@@ -1,8 +1,8 @@
-"""Feature: База данных"""
+from __future__ import annotations
 
-from feature.database.database import DatabaseManager, get_session
-from feature.database.logger import setup_logger, get_logger
-from feature.database.models import (
+from feature.storage.database import DatabaseManager, get_session
+from feature.storage.logger import setup_logger, get_logger
+from feature.storage.models import (
     Base,
     Embedding,
     Identity,

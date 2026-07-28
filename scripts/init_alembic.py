@@ -4,7 +4,7 @@ import sys
 from pathlib import Path
 
 from feature.config import ConfigManager
-from feature.database.database import DatabaseManager
+from feature.storage.database import DatabaseManager
 
 
 def init_alembic() -> None:

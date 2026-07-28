@@ -4,8 +4,8 @@ __version__ = "0.1.0-alpha"
 __author__ = "FaceArchive Team"
 
 from feature.config import ConfigManager, AppConfig
-from feature.database.database import DatabaseManager
-from feature.database.logger import setup_logger, get_logger
+from feature.storage.database import DatabaseManager
+from feature.storage.logger import setup_logger, get_logger
 from feature.core import (
     EventBus,
     WorkspaceManager,

@@ -14,8 +14,8 @@ from loguru import logger
 from PIL import Image, ImageOps
 
 from feature.config import ConfigManager
-from feature.database.database import DatabaseManager, get_session
-from feature.database.models import (
+from feature.storage.database import DatabaseManager, get_session
+from feature.storage.models import (
     Embedding,
     Identity,
     ImportLog,

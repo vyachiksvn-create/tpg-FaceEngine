@@ -10,7 +10,7 @@ from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session, sessionmaker
 
 from feature.config import ConfigManager
-from feature.database.models import Base, ImportStatus
+from feature.storage.models import Base, ImportStatus
 
 
 class DatabaseManager:

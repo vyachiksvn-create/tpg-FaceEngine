@@ -4,7 +4,8 @@
 
 ```
 ┌─────────────────────────────────────────┐
-│              CLI / GUI                   │
+│              Desktop                     │
+│  MainWindow + Panels                     │
 ├─────────────────────────────────────────┤
 │              TPG Core                    │
 │  EventBus + Workspace + Profile +        │
@@ -15,47 +16,74 @@
 ├─────────────────────────────────────────┤
 │  PhotoImporter (многопоточность)        │
 ├─────────────────────────────────────────┤
+│  Storage                                 │
 │  DatabaseManager (SQLAlchemy)           │
 │  + ImportLog, QualityCheck              │
 └─────────────────────────────────────────┘
 ```
 
-## TPG Core
+## Домены
 
-### EventBus
-- Слабосвязанная коммуникация между модулями
-- Подписка на события по типу
-- Приоритеты обработчиков
-- Поддержка одноразовых подписок
+### Core
+Слой, на котором строится всё остальное.
 
-### WorkspaceManager
-- Несколько независимых архивов
-- Каждый workspace имеет свою БД, индекс, логи, бэкапы
-- Быстрое переключение между архивами
-- Реестр workspace'ов в JSON
+- **EventBus** — слабосвязанная коммуникация между модулями
+- **WorkspaceManager** — управление несколькими независимыми архивами
+- **ProfileManager** — профили, экспорт/импорт, снапшоты, откат
+- **PluginManager** — единая регистрация и выбор движков
+- **HistoryManager** — журнал действий с возможностью отката
+- **DecisionEngine** — Smart Vote, Adaptive Threshold, объяснение решений
 
-### ProfileManager
-- Профили как отдельные YAML-файлы
-- Экспорт/импорт в JSON
-- Snapshot и rollback
-- Сравнение профилей (diff)
+### Desktop
+Рабочее место оператора.
 
-### PluginManager
-- Единая регистрация движков
-- Проверка интерфейсов (RecognitionPlugin, SearchPlugin)
-- Динамический выбор движка без перезапуска
+- **MainWindow** — главное окно
+- **Panels**:
+  - CandidatePanel — проверка кандидатов
+  - HistoryPanel — журнал действий
+  - WorkspacePanel — управление workspace
+  - ProfilePanel — управление профилями
+  - Settings — настройки
 
-### HistoryManager
-- Журнал всех действий в JSONL
-- Сессии
-- Фильтрация по типу, сущности, времени
-- Snapshot для отката
+### Recognition
+Распознавание лиц.
 
-### DecisionEngine
-- Стратегии: max, vote, hybrid
-- Cosine similarity как метрика
-- Объяснение решений (black box)
-- Адаптивный порог
+- **RecognitionEngine** — единый интерфейс
+- **Plugins**:
+  - InsightFace (buffalo_l, buffalo_s)
+  - ArcFace (планируется)
+  - FaceNet (планируется)
+
+### Search
+Поиск ближайших соседей.
+
+- **FaissIndex** — реализация на Faiss
+- Поддержка: flat, IVF, HNSW
+
+### Storage
+Хранение данных.
+
+- **DatabaseManager** — SQLAlchemy + SQLite
+- **Models**: Identity, Photo, Embedding, ImportLog, QualityCheck
+- **Logger** — Loguru
+- Файловое хранилище: thumbnails, temp, backup, export
+
+### Import
+Импорт фотографий.
+
+- **PhotoImporter** — многопоточный импорт
+- Дедупликация по SHA256
+- Оценка качества
+- Сохранение миниатюр
+
+### Plugins
+Реализации плагинов.
+
+### Studio
+Лаборатория алгоритмов.
+
+### Labs
+Экспериментальные функции.
 
 ## Уровни данных
 
@@ -85,31 +113,6 @@
 - Размытие, размер лица, угол поворота
 - Привязан к Photo
 
-## Плагины
-
-### Recognition Plugin
-Интерфейс:
-```python
-class RecognitionPlugin(Protocol):
-    name: str
-    def detect_faces(self, image) -> list[dict[str, Any]]
-    def get_embedding(self, image, face) -> Any
-    def load(self) -> None
-    def unload(self) -> None
-```
-
-### Search Plugin
-Интерфейс:
-```python
-class SearchPlugin(Protocol):
-    name: str
-    def add_vectors(self, vectors, ids) -> None
-    def search(self, query, top_k) -> list[tuple[int, float]]
-    def save(self, path) -> None
-    def load(self, path) -> None
-    def remove(self, ids) -> None
-```
-
 ## Профили
 
 Каждый профиль содержит:
@@ -138,3 +141,7 @@ class SearchPlugin(Protocol):
 - Кэширование миниатюр
 - Отложенное построение индекса
 - Поддержка GPU через InsightFace
+
+## Operator Workflow
+
+См. `docs/OPERATOR_WORKFLOW.md`

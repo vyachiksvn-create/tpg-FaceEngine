@@ -6,8 +6,8 @@ from pathlib import Path
 import pytest
 
 from feature.config import ConfigManager
-from feature.database.database import DatabaseManager
-from feature.database.models import Base, Identity, Photo, Embedding, ImportLog, ImportStatus
+from feature.storage.database import DatabaseManager
+from feature.storage.models import Base, Identity, Photo, Embedding, ImportLog, ImportStatus
 
 
 @pytest.fixture
