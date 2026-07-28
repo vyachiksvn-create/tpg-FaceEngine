@@ -12,8 +12,9 @@ import cv2
 import numpy as np
 from loguru import logger
 
+from feature.config import ConfigManager
 from feature.core.events import Event, EventBus
-from feature.import_.importer import PhotoImporter
+from feature.import_.importer import PhotoImporter, compute_sha256, save_thumbnail, assess_quality
 from feature.recognition.engine import RecognitionEngine
 from feature.search.index import FaissIndex
 from feature.storage.database import DatabaseManager, get_session
@@ -55,16 +56,19 @@ class ArchiveBuilder:
             return self.result
 
         person_dirs = [
-            p for p in self.known_path.iterdir()
-            if p.is_dir() and p.name.lower() != "x" and p.name.lower() != "unknown"
+            p for p in self.known_path.rglob("*")
+            if p.is_dir() and p.name.lower() not in {"x", "unknown"}
         ]
+        if not person_dirs:
+            person_dirs = [self.known_path]
         self.result.total_persons = len(person_dirs)
         logger.info(f"Found {len(person_dirs)} person directories")
 
         db = DatabaseManager.get_instance()
         db.init_db(create_tables=True)
 
-        recognition = RecognitionEngine()
+        config = ConfigManager.get_instance()
+        recognition = RecognitionEngine(config)
         recognition.load_model()
 
         faiss = FaissIndex(dimension=512)
@@ -115,7 +119,7 @@ class ArchiveBuilder:
 
             for photo_path in photo_files:
                 try:
-                    sha256 = PhotoImporter.compute_sha256(photo_path)
+                    sha256 = compute_sha256(photo_path)
                     existing_log = session.query(ImportLog).filter_by(sha256=sha256).first()
                     if existing_log and existing_log.status == ImportStatus.IMPORTED:
                         self.result.skipped += 1
@@ -140,7 +144,7 @@ class ArchiveBuilder:
                         thumb_dir.mkdir(parents=True, exist_ok=True)
                         thumbnail_name = f"{sha256[:16]}.jpg"
                         thumbnail_path = thumb_dir / thumbnail_name
-                        PhotoImporter.save_thumbnail(photo_path, thumbnail_path, 256)
+                        save_thumbnail(photo_path, thumbnail_path, 256)
                     except Exception:
                         pass
 
@@ -167,7 +171,7 @@ class ArchiveBuilder:
                     session.flush()
 
                     bbox = primary_face.bbox.astype(int)
-                    quality_data = PhotoImporter.assess_quality(image, tuple(bbox))
+                    quality_data = assess_quality(image, tuple(bbox))
                     qc = QualityCheck(
                         photo_id=photo.id,
                         blur_score=quality_data.get("blur_score"),

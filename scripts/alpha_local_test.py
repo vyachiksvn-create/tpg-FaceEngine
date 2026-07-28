@@ -1,4 +1,4 @@
-"""Alpha Local Test Runner.
+r"""Alpha Local Test Runner.
 
 Запуск тестов против D:\Base (копия боевой базы).
 Использование:
@@ -81,9 +81,12 @@ class AlphaLocalTest:
     def _run_import(self) -> None:
         logger.info("=== Import Known ===")
         t0 = time.perf_counter()
-        importer = PhotoImporter()
+        builder = ArchiveBuilder(
+            known_path=self.known_path,
+            workspace_path=self.workspace_path,
+        )
         try:
-            result = importer.import_folder(self.known_path)
+            result = builder.run()
             self.metrics.import_time_s = time.perf_counter() - t0
             self.metrics.errors = result.errors
             self.metrics.duplicates = result.skipped
@@ -95,7 +98,8 @@ class AlphaLocalTest:
 
     def _run_recognition(self) -> None:
         logger.info("=== Recognition Unknown ===")
-        engine = RecognitionEngine()
+        config = ConfigManager.get_instance()
+        engine = RecognitionEngine(config)
         faiss = FaissIndex(dimension=512)
         pipeline = RecognitionPipeline(engine, faiss)
         t0 = time.perf_counter()
@@ -108,6 +112,8 @@ class AlphaLocalTest:
             try:
                 result = pipeline.process_photo(photo_path)
                 if result.status == "no_faces":
+                    self.metrics.no_face += 1
+                elif result.status == "error":
                     self.metrics.no_face += 1
                 elif result.status == "found":
                     times.append(result.processing_time_ms)
@@ -127,7 +133,7 @@ class AlphaLocalTest:
         print(f"Unknown photos: {self.metrics.unknown_photos}")
         print(f"Import time: {self.metrics.import_time_s:.1f}s")
         print(f"Search time: {self.metrics.search_time_s:.1f}s")
-        print(f"Avg search: {self.metrics.avg_search_ms:.1f}ms")
+        print(f"Avg search: {self.metrics.avg_search_ms:.1f}ms" if times else "Avg search: n/a (no matches)")
         print(f"No face: {self.metrics.no_face}")
         print(f"Errors: {self.metrics.errors}")
         print("=" * 60 + "\n")

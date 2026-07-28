@@ -106,6 +106,7 @@ class AppConfig:
     version: str = "1.0"
     paths: PathsConfig = field(default_factory=PathsConfig)
     active_profile: str = "default"
+    recognition: RecognitionConfig = field(default_factory=RecognitionConfig)
     plugins: PluginsConfig = field(default_factory=PluginsConfig)
     logging: LoggingConfig = field(default_factory=LoggingConfig)
     database: DatabaseConfig = field(default_factory=DatabaseConfig)
@@ -162,6 +163,7 @@ class ConfigManager:
             version=raw.get("version", "1.0"),
             paths=self._parse_paths(raw.get("paths", {})),
             active_profile=raw.get("active_profile", "default"),
+            recognition=self._parse_recognition(raw.get("recognition", {})),
             plugins=self._parse_plugins(raw.get("plugins", {})),
             logging=self._parse_logging(raw.get("logging", {})),
             database=self._parse_database(raw.get("database", {})),
@@ -190,6 +192,9 @@ class ConfigManager:
             import_=data.get("import", ["basic"]),
         )
 
+    def _parse_recognition(self, data: dict[str, Any]) -> RecognitionConfig:
+        return RecognitionConfig(**data)
+
     def _parse_logging(self, data: dict[str, Any]) -> LoggingConfig:
         return LoggingConfig(**data)
 
@@ -206,6 +211,7 @@ class ConfigManager:
             "version": config.version,
             "paths": self._dataclass_to_dict(config.paths),
             "active_profile": config.active_profile,
+            "recognition": self._dataclass_to_dict(config.recognition),
             "plugins": self._dataclass_to_dict(config.plugins),
             "logging": self._dataclass_to_dict(config.logging),
             "database": self._dataclass_to_dict(config.database),

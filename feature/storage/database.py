@@ -101,6 +101,7 @@ class DatabaseManager:
         logger.debug("Соединения с базой данных закрыты")
 
 
+@contextmanager
 def get_session() -> Iterator[Session]:
     db = DatabaseManager.get_instance()
     with db.get_session() as session:
