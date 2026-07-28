@@ -11,6 +11,8 @@ from typing import Any, Sequence
 
 from loguru import logger
 
+from feature.core.events import Event, EventBus
+
 
 class ActionType(str, Enum):
     IMPORT = "import"
@@ -72,12 +74,52 @@ class HistoryEntry:
 
 
 class HistoryManager:
-    def __init__(self, history_dir: str | Path | None = None, max_entries: int = 100000) -> None:
+    def __init__(self, history_dir: str | Path | None = None, max_entries: int = 100000, event_bus: EventBus | None = None) -> None:
         self._history_dir = Path(history_dir) if history_dir else Path.cwd() / "history"
         self._history_dir.mkdir(parents=True, exist_ok=True)
         self._max_entries = max_entries
         self._current_session: str | None = None
         self._buffer: list[HistoryEntry] = []
+        self._event_bus = event_bus
+        self._subscription_id: str | None = None
+
+    def start(self) -> None:
+        if self._event_bus:
+            self._subscription_id = self._event_bus.subscribe(self._handle_event, priority=EventPriority.LOW)
+
+    def stop(self) -> None:
+        if self._event_bus and self._subscription_id:
+            self._event_bus.unsubscribe(self._subscription_id)
+            self._subscription_id = None
+
+    def _handle_event(self, event: Event) -> None:
+        event_type = event.event_type
+        payload = event.payload or {}
+        action_map = {
+            "photo.imported": ActionType.PHOTO_ADD,
+            "photo.removed": ActionType.PHOTO_REMOVE,
+            "photo.updated": ActionType.PHOTO_UPDATE,
+            "identity.created": ActionType.IDENTITY_CREATE,
+            "identity.updated": ActionType.IDENTITY_UPDATE,
+            "identity.merged": ActionType.IDENTITY_MERGE,
+            "profile.changed": ActionType.PROFILE_CHANGE,
+            "workspace.opened": ActionType.WORKSPACE_SWITCH,
+            "workspace.closed": ActionType.WORKSPACE_SWITCH,
+            "backup.created": ActionType.BACKUP,
+            "import.started": ActionType.IMPORT,
+            "import.finished": ActionType.IMPORT,
+        }
+        action = action_map.get(event_type)
+        if not action:
+            return
+        entry = HistoryEntry(
+            action=action,
+            entity_type=payload.get("entity_type", "unknown"),
+            entity_id=payload.get("entity_id"),
+            description=payload.get("description", event_type),
+            metadata={"source_event": event_type, "event_id": event.event_id},
+        )
+        self.record(entry)
 
     def start_session(self, session_id: str | None = None) -> str:
         self._current_session = session_id or uuid.uuid4().hex

@@ -7,12 +7,16 @@ from feature.config import ConfigManager, AppConfig
 from feature.storage.database import DatabaseManager
 from feature.storage.logger import setup_logger, get_logger
 from feature.core import (
+    DOMAIN_EVENTS,
+    IService,
     EventBus,
     WorkspaceManager,
     ProfileManager,
     PluginManager,
     HistoryManager,
     DecisionEngine,
+    JobManager,
+    BackupManager,
 )
 
 __all__ = [
@@ -22,10 +26,14 @@ __all__ = [
     "DatabaseManager",
     "setup_logger",
     "get_logger",
+    "DOMAIN_EVENTS",
+    "IService",
     "EventBus",
     "WorkspaceManager",
     "ProfileManager",
     "PluginManager",
     "HistoryManager",
     "DecisionEngine",
+    "JobManager",
+    "BackupManager",
 ]

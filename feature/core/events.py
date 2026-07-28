@@ -4,7 +4,7 @@ import time
 import uuid
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Awaitable, Callable, Coroutine, Sequence
+from typing import Any, Awaitable, Callable, Coroutine, Protocol, Sequence
 
 
 class EventPriority(int, Enum):
@@ -36,6 +36,11 @@ class Subscription:
     event_type: str | None = None
     priority: EventPriority = EventPriority.NORMAL
     once: bool = False
+
+
+class IService(Protocol):
+    def start(self) -> None: ...
+    def stop(self) -> None: ...
 
 
 class EventBus:
@@ -90,3 +95,25 @@ class EventBus:
 
     def clear(self) -> None:
         self._subscriptions.clear()
+
+
+DOMAIN_EVENTS = {
+    "workspace.opened",
+    "workspace.closed",
+    "workspace.created",
+    "workspace.deleted",
+    "profile.changed",
+    "photo.imported",
+    "photo.removed",
+    "photo.updated",
+    "identity.created",
+    "identity.updated",
+    "identity.merged",
+    "recognition.finished",
+    "search.finished",
+    "import.started",
+    "import.finished",
+    "import.progress",
+    "backup.created",
+    "history.recorded",
+}
