@@ -17,10 +17,10 @@ from loguru import logger
 
 from feature.config import ConfigManager
 from feature.core import EventBus, WorkspaceManager
-from feature.import_.importer import PhotoImporter
 from feature.recognition.engine import RecognitionEngine
 from feature.recognition.pipeline import RecognitionPipeline
 from feature.search.index import FaissIndex
+from feature.storage.archive_builder import ArchiveBuilder, ArchiveBuildResult
 from feature.storage.database import DatabaseManager
 
 

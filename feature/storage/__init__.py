@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from feature.storage.archive_builder import ArchiveBuilder, ArchiveBuildResult
 from feature.storage.database import DatabaseManager, get_session
 from feature.storage.identity_parser import IdentityParser
 from feature.storage.logger import setup_logger, get_logger
@@ -14,6 +15,8 @@ from feature.storage.models import (
 )
 
 __all__ = [
+    "ArchiveBuilder",
+    "ArchiveBuildResult",
     "DatabaseManager",
     "get_session",
     "setup_logger",
