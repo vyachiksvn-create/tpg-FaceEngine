@@ -1,0 +1,11 @@
+{
+  "name": "default",
+  "panels": {
+    "photo_viewer": {"visible": true, "position": "center", "size": 0.5},
+    "candidate_panel": {"visible": true, "position": "right", "size": 0.25},
+    "identity_card": {"visible": true, "position": "right", "size": 0.25},
+    "history_panel": {"visible": false, "position": "bottom", "size": 0.2},
+    "queue_panel": {"visible": true, "position": "left", "size": 0.2}
+  },
+  "created_at": 1234567890.0
+}

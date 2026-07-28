@@ -4,6 +4,7 @@ from feature.core.decision import DecisionEngine, DecisionResult, Candidate
 from feature.core.events import DOMAIN_EVENTS, Event, EventBus, EventPriority, Handler, AsyncHandler, IService, Subscription
 from feature.core.history import HistoryEntry, HistoryManager, ActionType
 from feature.core.jobs import Job, JobManager, JobStatus
+from feature.core.capabilities import Capabilities, CapabilityManager
 from feature.core.backup import BackupManager
 from feature.core.plugin import PluginDescriptor, PluginManager, RecognitionPlugin, SearchPlugin
 from feature.core.profile import ProfileConfig, ProfileManager, ProfileSnapshot
@@ -39,4 +40,6 @@ __all__ = [
     "JobManager",
     "JobStatus",
     "BackupManager",
+    "Capabilities",
+    "CapabilityManager",
 ]
