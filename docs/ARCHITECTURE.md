@@ -25,17 +25,17 @@
 ## Домены
 
 ### Core
-Слой, на котором строится всё остальное.
+Слой, на котором строится всё остальное. Нет внешних зависимостей.
 
 - **EventBus** — слабосвязанная коммуникация между модулями
 - **WorkspaceManager** — управление несколькими независимыми архивами
 - **ProfileManager** — профили, экспорт/импорт, снапшоты, откат
 - **PluginManager** — единая регистрация и выбор движков
 - **HistoryManager** — журнал действий с возможностью отката
-- **DecisionEngine** — Smart Vote, Adaptive Threshold, объяснение решений
+- **DecisionEngine** — базовые стратегии max/vote/hybrid
 
 ### Desktop
-Рабочее место оператора.
+Рабочее место оператора. Зависит от Core.
 
 - **MainWindow** — главное окно
 - **Panels**:
@@ -51,8 +51,7 @@
 - **RecognitionEngine** — единый интерфейс
 - **Plugins**:
   - InsightFace (buffalo_l, buffalo_s)
-  - ArcFace (планируется)
-  - FaceNet (планируется)
+  - Другие движки через PluginManager
 
 ### Search
 Поиск ближайших соседей.
@@ -76,14 +75,8 @@
 - Оценка качества
 - Сохранение миниатюр
 
-### Plugins
-Реализации плагинов.
-
-### Studio
-Лаборатория алгоритмов.
-
-### Labs
-Экспериментальные функции.
+### Plugins, Studio, Labs
+Зарезервировано для будущих расширений.
 
 ## Уровни данных
 
@@ -142,6 +135,17 @@
 - Отложенное построение индекса
 - Поддержка GPU через InsightFace
 
-## Operator Workflow
+## Текущий фокус
 
-См. `docs/OPERATOR_WORKFLOW.md`
+v0.2.0-alpha: Core + Desktop Foundation
+- Workspace, Backup, History
+- Функциональный Desktop
+- Стабильный импорт 20k фото
+
+## Документация
+
+- `docs/ROADMAP.md` — детальный план до v1.0
+- `docs/OPERATOR_WORKFLOW.md` — сценарий работы оператора
+- `docs/IDEAS.md` — backlog будущих идей
+- `docs/labs/` — концептуальные документы для будущих модулей
+- `docs/DECISIONS.md` — архитектурные решения (ADR)
