@@ -1,131 +1,71 @@
 # Operator Workflow
 
-Документ описывает сценарий работы оператора с TPG FaceEngine от запуска до завершения дня.
+## Overview
 
-## Цель
+This document describes the standard operator workflow for TPG FaceEngine Alpha.
 
-Этот документ проектирует интерфейс **до** написания кода GUI. Вместо вопроса «какие кнопки добавить?» мы задаём вопрос «какой следующий шаг делает оператор?».
-
-## Персонажи
-
-- **Оператор** — человек, который проверяет кандидатов, подтверждает совпадения, создаёт персон.
-- **Администратор** — настраивает workspace, профили, резервное копирование.
-- **Разработчик** — добавляет плагины, алгоритмы, пишет миграции.
-
-## Сценарий: Типичный рабочий день
-
-### 1. Запуск
+## Workspace Layout
 
 ```
-Запуск программы
-        │
-        ▼
-Открытие Workspace
-        │
-        ▼
-Проверка индекса
-        │
-        ▼
-Есть новые фото?
-      ├── Нет → Ожидание
-      └── Да
-             │
-             ▼
-Очередь обработки
-             │
-             ▼
-Распознавание
-             │
-             ▼
-Top-5 кандидатов
-             │
-             ▼
-Подтверждение оператором
-      ┌──────┴───────┐
-      ▼              ▼
-Совпадение      Новая персона
-      │              │
-      └──────┬───────┘
-             ▼
-Обновление БД
-             │
-             ▼
-Обновление индекса
-             │
-             ▼
-History + Backup
-             │
-             ▼
-Следующее фото
+D:\FaceEngine
+├── Base
+│   └── known person archives
+├── Inbox
+│   └── new photos from operators
+├── Review
+│   ├── Unknown
+│   └── NeedConfirm
+├── Reject
+│   ├── NoFace
+│   ├── BadQuality
+│   └── Errors
+├── Workspace
+│   ├── database
+│   ├── faiss
+│   ├── cache
+│   └── logs
+└── Reports
 ```
 
-### 2. Импорт
+## Standard Flow
 
-1. Оператор указывает папку с новыми фотографиями.
-2. Программа проверяет дубликаты по SHA256.
-3. Для каждого нового фото:
-   - Детекция лица
-   - Оценка качества
-   - Вычисление embedding
-   - Добавление в Faiss индекс
-4. Показывает прогресс: `16342 / 20118 (81%)`
-5. Оценивает оставшееся время.
+1. Operator places new photos into `Inbox`.
+2. System analyzes each photo.
+3. Results are sorted into:
+   - `Review/NeedConfirm` — matched candidates awaiting operator decision
+   - `Review/Unknown` — no match found
+   - `Reject/*` — technical failures
+4. Operator confirms matches or creates new identities.
+5. Confirmed photos are added to `Base` and embeddings are updated.
 
-### 3. Проверка кандидатов
+## Unknown Person Lifecycle
 
-1. Программа показывает фото и топ-5 кандидатов.
-2. Для каждого кандидата:
-   - Фото кандидата
-   - Имя персоны
-   - Процент совпадения
-   - Причина низкой уверенности (качество, размытие, угол)
-3. Оператор выбирает:
-   - **Подтвердить** — совпадение верное
-   - **Новая персона** — создать нового человека
-   - **Пропустить** — вернуться позже
-   - **Удалить** — мусорное фото
+```
+Inbox
+  ↓
+Recognition
+  ↓
+No Match
+  ↓
+Generate Unknown ID
+  ↓
+Rename to YYYYMMDD_HHMMSS_UNKNOWN_NNNNNN.ext
+  ↓
+Move to Review/Unknown
+  ↓
+Operator review
+  ↓
+Create Identity
+  ↓
+Base
+```
 
-### 4. Управление персонами
+## Unknown Grouping
 
-1. Просмотр карточки персоны:
-   - Фото
-   - Имя
-   - Количество фотографий
-   - Последнее обновление
-2. Действия:
-   - Переименовать
-   - Объединить с другой персоной
-   - Удалить
-   - Экспортировать
+Photos without matches can be grouped by similarity to help operator identify the same unknown person across multiple images.
 
-### 5. История и откат
+## Naming Convention
 
-1. Просмотр журнала всех действий.
-2. Фильтры: по типу, по персоне, по дате.
-3. Откат действия:
-   - До добавления фото
-   - До переименования
-   - До объединения персон
+Unknown files use timestamp-based names to preserve chronological order and simplify manual lookup.
 
-### 6. Завершение дня
-
-1. Автоматическое резервное копирование.
-2. Сохранение состояния индекса.
-3. Закрытие workspace.
-
-## Нефункциональные требования
-
-- Всё должно работать с 20 000+ фотографий без зависаний.
-- Интерфейс не должен перерисовываться при каждом импорте.
-- Все долгие операции — в отдельном потоке.
-- Прогресс-бар и ETA для всех долгих операций.
-- Возможность прервать операцию в любой момент.
-
-## Следующие шаги
-
-1. Спроектировать Desktop слой вокруг этого workflow.
-2. Реализовать панели: Import Queue, Candidate Panel, History Panel, Workspace Panel, Profile Panel.
-3. Сделать минимально функциональный интерфейс.
-4. Протестировать на 10–20 персонах.
-5. Собрать обратную связь от оператора.
-6. Улучшать на основе реального usage.
+Original filenames are preserved in metadata.
