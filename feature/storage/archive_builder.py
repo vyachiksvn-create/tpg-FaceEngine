@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import string
 import time
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -13,11 +14,14 @@ from loguru import logger
 
 from feature.config import ConfigManager
 from feature.core.events import Event, EventBus
-from feature.import_.importer import compute_sha256, save_thumbnail, assess_quality
+from feature.import_.importer import compute_sha256, save_thumbnail
+from feature.recognition.benchmark import BenchmarkManager
 from feature.recognition.engine import RecognitionEngine
+from feature.recognition.quality import QualityAnalyzer
 from feature.search.index import FaissIndex
 from feature.storage.archive_report import ArchiveReport
 from feature.storage.database import DatabaseManager, get_session
+from feature.storage.duplicate_detector import DuplicateDetector
 from feature.storage.identity_parser import IdentityParser
 from feature.storage.image_loader import ImageLoadError, ImageLoader
 from feature.storage.models import Embedding, Identity, ImportLog, ImportStatus, Photo, QualityCheck
@@ -51,7 +55,11 @@ class ArchiveBuilder:
         self.result = ArchiveBuildResult()
         self.reject_manager = RejectManager()
         self.report = ArchiveReport()
+        self.benchmark = BenchmarkManager()
+        self.quality_analyzer = QualityAnalyzer()
+        self.duplicate_detector = DuplicateDetector()
         self._embedding_times: list[float] = []
+        self._person_counter = 0
 
     def run(self) -> ArchiveBuildResult:
         t0 = time.perf_counter()
@@ -70,6 +78,7 @@ class ArchiveBuilder:
             person_dirs = [self.known_path]
         self.result.total_persons = len(person_dirs)
         self.report.persons_total = len(person_dirs)
+        self.benchmark.build.persons_total = len(person_dirs)
         logger.info(f"Found {len(person_dirs)} person directories")
 
         db = DatabaseManager.get_instance()
@@ -90,6 +99,7 @@ class ArchiveBuilder:
         ]
         self.result.total_photos = len(photo_files)
         self.report.photos_total = len(photo_files)
+        self.benchmark.build.photos_total = len(photo_files)
 
         processed = 0
         for photo_path in photo_files:
@@ -98,6 +108,8 @@ class ArchiveBuilder:
             if self.progress_callback:
                 progress = processed / len(photo_files) if photo_files else 0.0
                 self.progress_callback(progress, f"Обработано: {processed}/{len(photo_files)}")
+
+        self._finalize_identities()
 
         self.result.elapsed_ms = (time.perf_counter() - t0) * 1000
         self.result.faiss_vectors = faiss.total_vectors
@@ -113,6 +125,17 @@ class ArchiveBuilder:
         self.report.faiss_vectors = faiss.total_vectors
         self.report.build_time_s = self.result.elapsed_ms / 1000.0
 
+        self.benchmark.build.build_time_s = self.report.build_time_s
+        self.benchmark.build.embedding_count = len(self._embedding_times)
+        if self._embedding_times:
+            self.benchmark.build.avg_embedding_ms = sum(self._embedding_times) / len(self._embedding_times)
+            self.benchmark.build.median_embedding_ms = float(np.median(self._embedding_times))
+            self.benchmark.build.max_embedding_ms = float(max(self._embedding_times))
+        self.benchmark.build.imported = self.result.imported
+        self.benchmark.build.rejected = self.report.rejected
+        self.benchmark.build.skipped = self.result.skipped
+        self.benchmark.build.errors = self.result.errors
+
         try:
             with get_session() as session:
                 self.report.sqlite_identities = session.query(Identity).count()
@@ -123,6 +146,7 @@ class ArchiveBuilder:
 
         self.result.report = self.report
         self.report.print()
+        self.benchmark.print_report()
 
         logger.info(
             f"ArchiveBuilder finished: persons={self.result.total_persons}, "
@@ -130,6 +154,40 @@ class ArchiveBuilder:
             f"errors={self.result.errors}, time={self.result.elapsed_ms:.0f}ms"
         )
         return self.result
+
+    def _finalize_identities(self) -> None:
+        try:
+            with get_session() as session:
+                identities = session.query(Identity).all()
+                for identity in identities:
+                    photos = session.query(Photo).filter_by(identity_id=identity.id).all()
+                    if not photos:
+                        continue
+                    photo_embeddings = []
+                    for photo in photos:
+                        emb = session.query(Embedding).filter_by(photo_id=photo.id).first()
+                        if emb is not None:
+                            vec = emb.get_vector()
+                            if vec is not None and vec.size > 0:
+                                photo_embeddings.append((photo.id, vec))
+                    if not photo_embeddings:
+                        continue
+                    duplicates = self.duplicate_detector.find_within_identity(photo_embeddings)
+                    if duplicates:
+                        logger.info(f"Found {len(duplicates)} duplicates for identity {identity.id}")
+                    best_photo_id = photo_embeddings[0][0]
+                    best_score = -1.0
+                    for photo in photos:
+                        if photo.quality_score is not None and photo.quality_score > best_score:
+                            best_score = photo.quality_score
+                            best_photo_id = photo.id
+                    identity.representative_photo_id = best_photo_id
+                    if photos:
+                        avg_quality = sum(p.quality_score or 0.0 for p in photos) / len(photos)
+                        identity.health_score = min(avg_quality, 100.0)
+                session.commit()
+        except Exception as exc:
+            logger.warning(f"Cannot finalize identities: {exc}")
 
     def _import_photo(self, photo_path: Path, recognition: RecognitionEngine, faiss: FaissIndex) -> None:
         try:
@@ -170,10 +228,10 @@ class ArchiveBuilder:
 
             primary_face = faces[0]
             bbox = primary_face.bbox.astype(int)
-            quality_data = assess_quality(image, tuple(bbox))
+            qa = self.quality_analyzer.analyze(image, tuple(bbox))
             face_size = max(bbox[2] - bbox[0], bbox[3] - bbox[1])
-            if quality_data.get("blur_score", 0) < 50.0 and face_size < 60:
-                self.reject_manager.record(photo_path, "too_small", f"size={face_size}, blur={quality_data.get('blur_score', 0):.1f}")
+            if qa.blur_score < 50.0 and face_size < 60:
+                self.reject_manager.record(photo_path, "too_small", f"size={face_size}, blur={qa.blur_score:.1f}")
                 self.report.too_small += 1
                 return
 
@@ -184,13 +242,18 @@ class ArchiveBuilder:
             with get_session() as session:
                 identity = session.query(Identity).filter_by(original_folder_name=person_dir.name).first()
                 if identity is None:
+                    self._person_counter += 1
                     identity = Identity(
+                        person_id=f"{self._person_counter:09d}",
                         display_name=display_name,
                         original_folder_name=person_dir.name,
                         metadata_json=metadata_json,
                     )
                     session.add(identity)
                     session.flush()
+                elif not identity.person_id:
+                    self._person_counter += 1
+                    identity.person_id = f"{self._person_counter:09d}"
 
                 photo = Photo(
                     identity_id=identity.id,
@@ -200,6 +263,7 @@ class ArchiveBuilder:
                     height=height,
                     thumbnail_path=str(thumbnail_path) if thumbnail_path else None,
                     is_primary=True,
+                    quality_score=qa.total_score,
                 )
                 session.add(photo)
                 session.flush()
@@ -219,12 +283,12 @@ class ArchiveBuilder:
 
                 qc = QualityCheck(
                     photo_id=photo.id,
-                    blur_score=quality_data.get("blur_score"),
-                    face_size=quality_data.get("face_size"),
-                    yaw_angle=quality_data.get("yaw_angle"),
-                    pitch_angle=quality_data.get("pitch_angle"),
-                    confidence=quality_data.get("confidence"),
-                    is_good_quality=quality_data.get("blur_score", 0) > 100.0,
+                    blur_score=qa.blur_score,
+                    face_size=qa.face_size,
+                    yaw_angle=qa.yaw_angle,
+                    pitch_angle=qa.pitch_angle,
+                    confidence=qa.confidence,
+                    is_good_quality=qa.is_good_quality,
                 )
                 session.add(qc)
 
@@ -238,6 +302,7 @@ class ArchiveBuilder:
                 session.add(log)
 
                 faiss.add_vectors(embedding_vector, [photo.id])
+                self.duplicate_detector._embeddings[photo.id] = embedding_vector
                 self.result.imported += 1
                 session.commit()
 

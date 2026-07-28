@@ -122,6 +122,7 @@ class AlphaLocalTest:
                 self.metrics.errors += 1
         self.metrics.search_time_s = time.perf_counter() - t0
         self.metrics.avg_search_ms = sum(times) / len(times) if times else 0.0
+        self._search_times = times
         logger.info(f"Processed: {len(unknown_files)}, No face: {self.metrics.no_face}, Errors: {self.metrics.errors}")
         logger.info(f"Avg search: {self.metrics.avg_search_ms:.1f}ms, Total: {self.metrics.search_time_s:.1f}s")
 
@@ -133,7 +134,7 @@ class AlphaLocalTest:
         print(f"Unknown photos: {self.metrics.unknown_photos}")
         print(f"Import time: {self.metrics.import_time_s:.1f}s")
         print(f"Search time: {self.metrics.search_time_s:.1f}s")
-        print(f"Avg search: {self.metrics.avg_search_ms:.1f}ms" if times else "Avg search: n/a (no matches)")
+        print(f"Avg search: {self.metrics.avg_search_ms:.1f}ms" if getattr(self, '_search_times', []) else "Avg search: n/a (no matches)")
         print(f"No face: {self.metrics.no_face}")
         print(f"Errors: {self.metrics.errors}")
         print("=" * 60 + "\n")

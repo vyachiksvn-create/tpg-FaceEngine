@@ -19,9 +19,11 @@ from sqlalchemy import (
     LargeBinary,
     Index,
 )
-from sqlalchemy.orm import declarative_base, relationship, Mapped, mapped_column
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
-Base = declarative_base()
+
+class Base(DeclarativeBase):
+    pass
 
 
 class ImportStatus(str, Enum):
@@ -36,6 +38,7 @@ class Identity(Base):
     __tablename__ = "identities"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    person_id: Mapped[str | None] = mapped_column(String(32), unique=True, nullable=True, index=True)
     display_name: Mapped[str | None] = mapped_column(String(255), nullable=True, index=True)
     original_folder_name: Mapped[str | None] = mapped_column(String(1024), nullable=True)
     metadata_json: Mapped[str | None] = mapped_column(Text, nullable=True)
@@ -44,6 +47,8 @@ class Identity(Base):
         DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
     )
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    representative_photo_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
+    health_score: Mapped[float | None] = mapped_column(Float, nullable=True)
 
     photos: Mapped[list["Photo"]] = relationship("Photo", back_populates="identity", cascade="all, delete-orphan")
 
@@ -65,6 +70,7 @@ class Photo(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     thumbnail_path: Mapped[str | None] = mapped_column(String(1024), nullable=True)
     is_primary: Mapped[bool] = mapped_column(Boolean, default=False)
+    quality_score: Mapped[float | None] = mapped_column(Float, nullable=True, index=True)
 
     identity: Mapped["Identity | None"] = relationship("Identity", back_populates="photos")
     embeddings: Mapped[list["Embedding"]] = relationship("Embedding", back_populates="photo", cascade="all, delete-orphan")
