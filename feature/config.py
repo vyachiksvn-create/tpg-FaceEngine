@@ -73,18 +73,6 @@ class PerformanceConfig:
 
 
 @dataclass
-class ProfileConfig:
-    name: str = "По умолчанию"
-    description: str = ""
-    recognition: RecognitionConfig = field(default_factory=RecognitionConfig)
-    search: SearchConfig = field(default_factory=SearchConfig)
-    import_: ImportConfig = field(default_factory=ImportConfig)
-    quality: QualityConfig = field(default_factory=QualityConfig)
-    gui: GUIConfig = field(default_factory=GUIConfig)
-    performance: PerformanceConfig = field(default_factory=PerformanceConfig)
-
-
-@dataclass
 class DatabaseConfig:
     echo: bool = False
     pool_size: int = 5
@@ -117,21 +105,11 @@ class PluginsConfig:
 class AppConfig:
     version: str = "1.0"
     paths: PathsConfig = field(default_factory=PathsConfig)
-    profiles: dict[str, ProfileConfig] = field(default_factory=dict)
     active_profile: str = "default"
     plugins: PluginsConfig = field(default_factory=PluginsConfig)
     logging: LoggingConfig = field(default_factory=LoggingConfig)
     database: DatabaseConfig = field(default_factory=DatabaseConfig)
     backup: BackupConfig = field(default_factory=BackupConfig)
-
-    @property
-    def active(self) -> ProfileConfig:
-        if self.active_profile not in self.profiles:
-            logger.warning(
-                f"Профиль '{self.active_profile}' не найден, используется 'default'"
-            )
-            self.active_profile = "default"
-        return self.profiles[self.active_profile]
 
 
 class ConfigManager:
@@ -159,8 +137,7 @@ class ConfigManager:
         config_path = self._find_config()
         if not config_path.exists():
             logger.warning(f"Конфигурационный файл не найден: {config_path}")
-            logger.info("Создается конфигурация по умолчанию")
-            return self._default_config()
+            return AppConfig()
 
         with open(config_path, "r", encoding="utf-8") as f:
             raw = yaml.safe_load(f) or {}
@@ -170,7 +147,6 @@ class ConfigManager:
     def _find_config(self) -> Path:
         if self._config_path:
             return self._config_path
-
         candidates = [
             Path.cwd() / "config.yaml",
             Path.cwd() / "config.yml",
@@ -179,18 +155,12 @@ class ConfigManager:
         for candidate in candidates:
             if candidate.exists():
                 return candidate
-
         return Path.cwd() / "config.yaml"
 
     def _parse_config(self, raw: dict[str, Any]) -> AppConfig:
-        profiles = {}
-        for name, profile_data in raw.get("profiles", {}).items():
-            profiles[name] = self._parse_profile(profile_data)
-
         return AppConfig(
             version=raw.get("version", "1.0"),
             paths=self._parse_paths(raw.get("paths", {})),
-            profiles=profiles,
             active_profile=raw.get("active_profile", "default"),
             plugins=self._parse_plugins(raw.get("plugins", {})),
             logging=self._parse_logging(raw.get("logging", {})),
@@ -198,17 +168,17 @@ class ConfigManager:
             backup=self._parse_backup(raw.get("backup", {})),
         )
 
-    def _parse_profile(self, data: dict[str, Any]) -> ProfileConfig:
-        return ProfileConfig(
-            name=data.get("name", "Профиль"),
-            description=data.get("description", ""),
-            recognition=RecognitionConfig(**data.get("recognition", {})),
-            search=SearchConfig(**data.get("search", {})),
-            import_=ImportConfig(**data.get("import", {})),
-            quality=QualityConfig(**data.get("quality", {})),
-            gui=GUIConfig(**data.get("gui", {})),
-            performance=PerformanceConfig(**data.get("performance", {})),
-        )
+    def _parse_profile(self, data: dict[str, Any]) -> dict[str, Any]:
+        return {
+            "name": data.get("name", "Профиль"),
+            "description": data.get("description", ""),
+            "recognition": data.get("recognition", {}),
+            "search": data.get("search", {}),
+            "import": data.get("import", {}),
+            "quality": data.get("quality", {}),
+            "gui": data.get("gui", {}),
+            "performance": data.get("performance", {}),
+        }
 
     def _parse_paths(self, data: dict[str, Any]) -> PathsConfig:
         return PathsConfig(**data)
@@ -229,38 +199,20 @@ class ConfigManager:
     def _parse_backup(self, data: dict[str, Any]) -> BackupConfig:
         return BackupConfig(**data)
 
-    def _default_config(self) -> AppConfig:
-        return AppConfig(
-            profiles={
-                "default": ProfileConfig(
-                    name="По умолчанию",
-                    description="Сбалансированные настройки",
-                )
-            },
-            active_profile="default",
-        )
-
     def save_config(self, config: AppConfig, path: str | Path | None = None) -> None:
         target = Path(path) if path else self._find_config()
         target.parent.mkdir(parents=True, exist_ok=True)
-
         data = {
             "version": config.version,
             "paths": self._dataclass_to_dict(config.paths),
             "active_profile": config.active_profile,
-            "profiles": {
-                name: self._dataclass_to_dict(profile)
-                for name, profile in config.profiles.items()
-            },
             "plugins": self._dataclass_to_dict(config.plugins),
             "logging": self._dataclass_to_dict(config.logging),
             "database": self._dataclass_to_dict(config.database),
             "backup": self._dataclass_to_dict(config.backup),
         }
-
         with open(target, "w", encoding="utf-8") as f:
             yaml.dump(data, f, allow_unicode=True, sort_keys=False, default_flow_style=False)
-
         logger.info(f"Конфигурация сохранена: {target}")
 
     def _dataclass_to_dict(self, obj: Any) -> dict[str, Any]:
@@ -269,12 +221,7 @@ class ConfigManager:
             for key, value in obj.__dict__.items():
                 if key.startswith("_"):
                     continue
-                if isinstance(value, list):
-                    result[key] = value
-                elif hasattr(value, "__dataclass_fields__"):
-                    result[key] = self._dataclass_to_dict(value)
-                else:
-                    result[key] = value
+                result[key] = value
             return result
         return obj
 

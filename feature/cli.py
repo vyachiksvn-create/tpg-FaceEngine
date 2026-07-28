@@ -8,6 +8,7 @@ import cv2
 from loguru import logger
 
 from feature.config import AppConfig, ConfigManager
+from feature.core import EventBus, WorkspaceManager, ProfileManager
 from feature.database.database import DatabaseManager
 from feature.database.logger import setup_logger
 from feature.database.models import Embedding, Identity, Photo
@@ -29,8 +30,96 @@ def main(ctx: click.Context, config_path: str | None, profile: str | None) -> No
         config.active_profile = profile
     setup_logger(config)
     DatabaseManager.get_instance()
+    event_bus = EventBus()
     ctx.obj["config"] = config
+    ctx.obj["event_bus"] = event_bus
     logger.info(f"FaceArchive v0.1.0-alpha запущен. Профиль: {config.active_profile}")
+
+
+@main.group()
+def workspace() -> None:
+    """Управление рабочими пространствами"""
+    pass
+
+
+@workspace.command("create")
+@click.argument("name")
+@click.option("--path", type=click.Path(), help="Путь для workspace")
+@click.pass_context
+def workspace_create(ctx: click.Context, name: str, path: str | None) -> None:
+    mgr = WorkspaceManager()
+    ws = mgr.create(name, path)
+    click.echo(f"Workspace создан: {name} -> {ws.path}")
+
+
+@workspace.command("list")
+@click.pass_context
+def workspace_list(ctx: click.Context) -> None:
+    mgr = WorkspaceManager()
+    for ws in mgr.list_workspaces():
+        active = "*" if ws.is_active else " "
+        click.echo(f"{active} {ws.name} -> {ws.path}")
+
+
+@workspace.command("activate")
+@click.argument("name")
+@click.pass_context
+def workspace_activate(ctx: click.Context, name: str) -> None:
+    mgr = WorkspaceManager()
+    ws = mgr.activate(name)
+    click.echo(f"Workspace активирован: {ws.name}")
+
+
+@workspace.command("delete")
+@click.argument("name")
+@click.pass_context
+def workspace_delete(ctx: click.Context, name: str) -> None:
+    mgr = WorkspaceManager()
+    mgr.delete(name)
+    click.echo(f"Workspace удален: {name}")
+
+
+@main.group()
+def profile() -> None:
+    """Управление профилями"""
+    pass
+
+
+@profile.command("list")
+@click.pass_context
+def profile_list(ctx: click.Context) -> None:
+    mgr = ProfileManager()
+    for name in mgr.list_profiles():
+        active = "*" if mgr.active_name == name else " "
+        click.echo(f"{active} {name}")
+
+
+@profile.command("activate")
+@click.argument("name")
+@click.pass_context
+def profile_activate(ctx: click.Context, name: str) -> None:
+    mgr = ProfileManager()
+    p = mgr.activate(name)
+    click.echo(f"Профиль активирован: {p.name}")
+
+
+@profile.command("export")
+@click.argument("name")
+@click.argument("path", type=click.Path())
+@click.pass_context
+def profile_export(ctx: click.Context, name: str, path: str) -> None:
+    mgr = ProfileManager()
+    mgr.export_profile(name, path)
+    click.echo(f"Профиль экспортирован: {name} -> {path}")
+
+
+@profile.command("import")
+@click.argument("path", type=click.Path(exists=True))
+@click.pass_context
+def profile_import(ctx: click.Context, path: str) -> None:
+    mgr = ProfileManager()
+    p = mgr.import_profile(Path(path))
+    click.echo(f"Профиль импортирован: {p.name}")
 
 
 @main.command()
@@ -110,19 +199,6 @@ def info(ctx: click.Context) -> None:
     click.echo(f"Идентичности: {identity_count}")
     click.echo(f"Фотографии: {photo_count}")
     click.echo(f"Embeddings: {embedding_count}")
-
-
-@main.command()
-@click.argument("profile_name")
-@click.pass_context
-def profile_use(ctx: click.Context, profile_name: str) -> None:
-    config: AppConfig = ctx.obj["config"]
-    if profile_name not in config.profiles:
-        click.echo(f"Профиль '{profile_name}' не найден", err=True)
-        sys.exit(1)
-    config.active_profile = profile_name
-    config.save_config(config)
-    click.echo(f"Активный профиль: {profile_name}")
 
 
 if __name__ == "__main__":

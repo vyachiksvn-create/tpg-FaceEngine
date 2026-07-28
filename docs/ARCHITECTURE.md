@@ -1,4 +1,4 @@
-# Архитектура FaceArchive
+# Архитектура TPG FaceEngine
 
 ## Общая схема
 
@@ -6,7 +6,9 @@
 ┌─────────────────────────────────────────┐
 │              CLI / GUI                   │
 ├─────────────────────────────────────────┤
-│  ConfigManager (профили, YAML)          │
+│              TPG Core                    │
+│  EventBus + Workspace + Profile +        │
+│  PluginManager + History + Decision      │
 ├─────────────────────────────────────────┤
 │  RecognitionEngine (InsightFace)        │
 │  + FaissIndex                           │
@@ -17,6 +19,43 @@
 │  + ImportLog, QualityCheck              │
 └─────────────────────────────────────────┘
 ```
+
+## TPG Core
+
+### EventBus
+- Слабосвязанная коммуникация между модулями
+- Подписка на события по типу
+- Приоритеты обработчиков
+- Поддержка одноразовых подписок
+
+### WorkspaceManager
+- Несколько независимых архивов
+- Каждый workspace имеет свою БД, индекс, логи, бэкапы
+- Быстрое переключение между архивами
+- Реестр workspace'ов в JSON
+
+### ProfileManager
+- Профили как отдельные YAML-файлы
+- Экспорт/импорт в JSON
+- Snapshot и rollback
+- Сравнение профилей (diff)
+
+### PluginManager
+- Единая регистрация движков
+- Проверка интерфейсов (RecognitionPlugin, SearchPlugin)
+- Динамический выбор движка без перезапуска
+
+### HistoryManager
+- Журнал всех действий в JSONL
+- Сессии
+- Фильтрация по типу, сущности, времени
+- Snapshot для отката
+
+### DecisionEngine
+- Стратегии: max, vote, hybrid
+- Cosine similarity как метрика
+- Объяснение решений (black box)
+- Адаптивный порог
 
 ## Уровни данных
 
@@ -51,21 +90,24 @@
 ### Recognition Plugin
 Интерфейс:
 ```python
-class BaseRecognitionEngine(ABC):
-    def detect_faces(self, image) -> list[FaceDetection]
-    def get_embedding(self, image, face) -> np.ndarray
-    def load_model(self) -> None
-    def unload_model(self) -> None
+class RecognitionPlugin(Protocol):
+    name: str
+    def detect_faces(self, image) -> list[dict[str, Any]]
+    def get_embedding(self, image, face) -> Any
+    def load(self) -> None
+    def unload(self) -> None
 ```
 
 ### Search Plugin
 Интерфейс:
 ```python
-class BaseSearchIndex(ABC):
-    def add_vectors(self, vectors, ids)
-    def search(self, query_vector, top_k) -> list[tuple[int, float]]
-    def save(self, path)
-    def load(self, path)
+class SearchPlugin(Protocol):
+    name: str
+    def add_vectors(self, vectors, ids) -> None
+    def search(self, query, top_k) -> list[tuple[int, float]]
+    def save(self, path) -> None
+    def load(self, path) -> None
+    def remove(self, ids) -> None
 ```
 
 ## Профили
