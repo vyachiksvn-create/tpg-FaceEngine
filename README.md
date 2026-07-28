@@ -159,8 +159,11 @@ tpg-FaceEngine/
 ├── requirements.txt
 ├── pyproject.toml
 ├── .gitignore
+├── layouts/
+│   └── default.layout.json
 ├── scripts/
-│   └── init_alembic.py
+│   ├── init_alembic.py
+│   └── alpha_local_test.py
 ├── tests/
 │   ├── test_config.py
 │   ├── test_database.py
@@ -172,22 +175,66 @@ tpg-FaceEngine/
 │   ├── test_workspace.py
 │   ├── test_profile.py
 │   ├── test_decision.py
-│   └── test_history.py
+│   ├── test_history.py
+│   └── manual/
+│       ├── 001_build_archive.md
+│       ├── 002_recognition_batch.md
+│       ├── 003_operator_workflow.md
+│       ├── 004_cancel_job.md
+│       ├── 005_empty_folder.md
+│       ├── 006_corrupted_image.md
+│       ├── 007_duplicate_person.md
+│       ├── 008_no_face.md
+│       ├── 009_low_quality.md
+│       └── 010_large_archive.md
 └── docs/
     ├── ARCHITECTURE.md
-    └── OPERATOR_WORKFLOW.md
+    ├── OPERATOR_WORKFLOW.md
+    ├── VISION.md
+    ├── ROADMAP.md
+    ├── DECISIONS.md
+    ├── QUALITY.md
+    ├── OBSERVATIONS.md
+    ├── TEST_ENVIRONMENT.md
+    ├── IDEAS.md
+    └── labs/
+        ├── STUDIO.md
+        ├── SMART_VOTE.md
+        ├── ADAPTIVE_THRESHOLD.md
+        ├── BLACK_BOX.md
+        ├── MARKETPLACE.md
+        ├── EVOLUTION_MODE.md
+        ├── WORKFLOW_BUILDER.md
+        ├── BENCHMARK_LAB.md
+        └── SANDBOX.md
 ```
 
 ## Документация
 
 - `docs/ARCHITECTURE.md` — архитектура проекта
 - `docs/OPERATOR_WORKFLOW.md` — сценарий работы оператора
+- `docs/VISION.md` — миссия и принципы проекта
+- `docs/ROADMAP.md` — план развития до v2.0
+- `docs/DECISIONS.md` — архитектурные решения (ADR)
+- `docs/QUALITY.md` — критерии качества и KPI
+- `docs/OBSERVATIONS.md` — журнал наблюдений из эксплуатации
+- `docs/TEST_ENVIRONMENT.md` — стенд для тестирования
+- `docs/IDEAS.md` — backlog будущих идей
+- `docs/labs/*.md` — концептуальные документы для будущих модулей
 
-## Запуск тестов
+## Локальное тестирование
 
 ```bash
-pytest tests/ -v
+# Запуск против D:\Base
+python scripts/alpha_local_test.py --known "D:\Base" --unknown "D:\Base\x" --workspace "D:\FaceEngine_Test\Workspace"
 ```
+
+## Следующие шаги
+
+- Alpha 0.1 "Operator Lab" — тестирование на реальной базе
+- Сбор отчётов в `docs/OBSERVATIONS.md`
+- Исправление ошибок уровней S1/S2
+- Подготовка к Beta
 
 ## Лицензия
 
