@@ -1,0 +1,68 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv/
+venv/
+ENV/
+env/
+.eggs/
+*.egg-info/
+dist/
+build/
+pip-wheel-metadata/
+share/python-wheels/
+*.manifest
+*.spec
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# FaceArchive
+workspace/
+*.db
+*.index
+*.npy
+*.log
+*.yaml.backup
+temp/
+Backup/
+Logs/
+Thumbnails/
+
+# Working directories
+base_photos/
+input_photos/
+
+# Working files
+embeddings.npy
+metadata.json
+build_*.log
+operator_app.py
+cluster_unknown.py
+test_batch.py
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Jupyter
+.ipynb_checkpoints
+
+# mypy
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# ruff
+.ruff_cache/
