@@ -20,6 +20,9 @@ class PathsConfig:
     backup: str = ""
     temp: str = ""
     thumbnails: str = ""
+    review: str = ""
+    matches: str = ""
+    reports: str = ""
 
 
 @dataclass
@@ -235,13 +238,25 @@ class ConfigManager:
         dirs = [
             paths.workspace,
             os.path.join(paths.workspace, "storage"),
+            paths.base_photos,
             paths.incoming,
-            paths.rejected,
+            os.path.join(paths.rejected, "NoFace"),
+            os.path.join(paths.rejected, "BadQuality"),
+            os.path.join(paths.rejected, "Errors"),
+            paths.review,
+            os.path.join(paths.review, "Unknown"),
+            os.path.join(paths.review, "NeedConfirm"),
+            os.path.join(paths.review, "NewPersons"),
+            paths.matches,
             paths.export,
+            os.path.join(paths.workspace, "database"),
+            os.path.join(paths.workspace, "faiss"),
+            os.path.join(paths.workspace, "cache"),
             paths.logs,
             paths.backup,
             paths.temp,
             paths.thumbnails,
+            paths.reports,
         ]
         for d in dirs:
             if d:
