@@ -15,6 +15,7 @@ from PIL import Image, ImageOps
 
 from feature.config import ConfigManager
 from feature.storage.database import DatabaseManager, get_session
+from feature.storage.identity_parser import IdentityParser
 from feature.storage.models import (
     Embedding,
     Identity,
@@ -147,7 +148,14 @@ def process_single_image(
             else:
                 qc = None
 
-            identity = Identity(full_name=None)
+            folder_name = image_path.parent.name
+            display_name, extra_metadata = IdentityParser.parse_folder_name(folder_name)
+            metadata_json = IdentityParser.build_metadata_json(extra_metadata)
+            identity = Identity(
+                display_name=display_name,
+                original_folder_name=folder_name,
+                metadata_json=metadata_json,
+            )
             session.add(identity)
             session.flush()
 

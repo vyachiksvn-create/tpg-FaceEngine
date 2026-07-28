@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from feature.storage.database import DatabaseManager, get_session
+from feature.storage.identity_parser import IdentityParser
 from feature.storage.logger import setup_logger, get_logger
 from feature.storage.models import (
     Base,
@@ -17,6 +18,7 @@ __all__ = [
     "get_session",
     "setup_logger",
     "get_logger",
+    "IdentityParser",
     "Base",
     "Embedding",
     "Identity",

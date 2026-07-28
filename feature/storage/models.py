@@ -36,7 +36,9 @@ class Identity(Base):
     __tablename__ = "identities"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    full_name: Mapped[str | None] = mapped_column(String(255), nullable=True, index=True)
+    display_name: Mapped[str | None] = mapped_column(String(255), nullable=True, index=True)
+    original_folder_name: Mapped[str | None] = mapped_column(String(1024), nullable=True)
+    metadata_json: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
@@ -46,7 +48,7 @@ class Identity(Base):
     photos: Mapped[list["Photo"]] = relationship("Photo", back_populates="identity", cascade="all, delete-orphan")
 
     def __repr__(self) -> str:
-        return f"<Identity(id={self.id}, full_name='{self.full_name}')>"
+        return f"<Identity(id={self.id}, display_name='{self.display_name}')>"
 
 
 class Photo(Base):
