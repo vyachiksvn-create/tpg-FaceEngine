@@ -17,24 +17,50 @@ class FaissIndex:
         self._reverse_id_map: dict[int, int] = {}
         self._next_id = 0
 
-    def create_index(self, index_type: str = "flat") -> None:
-        if index_type == "flat":
-            self._index = faiss.IndexFlatL2(self.dimension)
-        elif index_type == "ivf":
-            quantizer = faiss.IndexFlatL2(self.dimension)
-            self._index = faiss.IndexIVFFlat(quantizer, self.dimension, 100)
-        elif index_type == "hnsw":
-            self._index = faiss.IndexHNSWFlat(self.dimension, 32)
+    def create_index(self, index_type: str = "flat", metric: str = "l2") -> None:
+        if metric not in {"l2", "ip"}:
+            raise ValueError(f"Неподдерживаемая метрика: {metric}")
+        self.metric = metric
+        if metric == "ip":
+            if index_type == "flat":
+                self._index = faiss.IndexFlatIP(self.dimension)
+            elif index_type == "ivf":
+                quantizer = faiss.IndexFlatIP(self.dimension)
+                self._index = faiss.IndexIVFFlat(quantizer, self.dimension, 100)
+            elif index_type == "hnsw":
+                self._index = faiss.IndexHNSWFlat(self.dimension, 32)
+            else:
+                raise ValueError(f"Неподдерживаемый тип индекса: {index_type}")
         else:
-            raise ValueError(f"Неподдерживаемый тип индекса: {index_type}")
-        logger.info(f"Faiss индекс создан: {index_type}, размерность: {self.dimension}")
+            if index_type == "flat":
+                self._index = faiss.IndexFlatL2(self.dimension)
+            elif index_type == "ivf":
+                quantizer = faiss.IndexFlatL2(self.dimension)
+                self._index = faiss.IndexIVFFlat(quantizer, self.dimension, 100)
+            elif index_type == "hnsw":
+                self._index = faiss.IndexHNSWFlat(self.dimension, 32)
+            else:
+                raise ValueError(f"Неподдерживаемый тип индекса: {index_type}")
+        logger.info(f"Faiss индекс создан: {index_type}, размерность: {self.dimension}, метрика: {metric}")
+
+    def _prepare_vectors(self, vectors: np.ndarray) -> np.ndarray:
+        vectors = np.array(vectors, dtype=np.float32)
+        if vectors.ndim == 1:
+            vectors = vectors.reshape(1, -1)
+        if self.metric == "ip":
+            self._normalize(vectors)
+        return vectors
+
+    @staticmethod
+    def _normalize(vectors: np.ndarray) -> None:
+        norms = np.linalg.norm(vectors, axis=1, keepdims=True)
+        norms[norms == 0] = 1.0
+        vectors /= norms
 
     def add_vectors(self, vectors: np.ndarray, ids: list[int]) -> None:
         if self._index is None:
             self.create_index()
-        vectors = np.array(vectors, dtype=np.float32)
-        if vectors.ndim == 1:
-            vectors = vectors.reshape(1, -1)
+        vectors = self._prepare_vectors(vectors)
         self._index.add(vectors)
         for idx in ids:
             self._id_map[idx] = self._next_id
@@ -73,7 +99,11 @@ class FaissIndex:
         faiss.write_index(self._index, index_path)
         import json
         with open(id_map_path, "w", encoding="utf-8") as f:
-            json.dump({"id_map": self._id_map, "next_id": self._next_id}, f)
+            json.dump({
+                "id_map": self._id_map,
+                "next_id": self._next_id,
+                "metric": getattr(self, "metric", "l2"),
+            }, f)
         logger.info(f"Faiss индекс сохранен: {index_path}")
 
     def load(self, index_path: str, id_map_path: str) -> None:
@@ -86,8 +116,9 @@ class FaissIndex:
         self._id_map = {int(k): int(v) for k, v in data.get("id_map", {}).items()}
         self._reverse_id_map = {int(v): int(k) for k, v in self._id_map.items()}
         self._next_id = data.get("next_id", max(self._reverse_id_map.keys()) + 1 if self._reverse_id_map else 0)
+        self.metric = data.get("metric", "l2")
         self.dimension = self._index.d
-        logger.info(f"Faiss индекс загружен: {index_path}, векторов: {self._index.ntotal}")
+        logger.info(f"Faiss индекс загружен: {index_path}, векторов: {self._index.ntotal}, метрика: {self.metric}")
 
     @property
     def total_vectors(self) -> int:

@@ -17,8 +17,13 @@ from loguru import logger
 
 from feature.config import ConfigManager
 from feature.core import EventBus, WorkspaceManager
+from feature.recognition.archive_doctor import ArchiveDoctor
+from feature.recognition.benchmark import BenchmarkManager
 from feature.recognition.engine import RecognitionEngine
+from feature.recognition.inspector import CandidateInspector
 from feature.recognition.pipeline import RecognitionPipeline
+from feature.recognition.threshold_tuner import ThresholdTuner
+from feature.recognition.validator import RecognitionValidator
 from feature.search.index import FaissIndex
 from feature.storage.archive_builder import ArchiveBuilder, ArchiveBuildResult
 from feature.storage.database import DatabaseManager
@@ -34,21 +39,27 @@ class TestMetrics:
     errors: int = 0
     no_face: int = 0
     duplicates: int = 0
+    validation_found: int = 0
+    validation_not_found: int = 0
+    validation_avg_top1_distance: float = 0.0
 
 
 class AlphaLocalTest:
-    def __init__(self, known_path: Path, unknown_path: Path, workspace_path: Path) -> None:
+    def __init__(self, known_path: Path, unknown_path: Path, workspace_path: Path, limit: int | None = None) -> None:
         self.known_path = Path(known_path)
         self.unknown_path = Path(unknown_path)
         self.workspace_path = Path(workspace_path)
+        self.limit = limit
         self.metrics = TestMetrics()
 
     def run(self) -> TestMetrics:
         logger.info("=== Alpha 0.1 Local Test ===")
         self._prepare_workspace()
         self._count_photos()
+        self._run_archive_doctor()
         self._run_import()
-        self._run_recognition()
+        self._run_validation()
+        self._run_threshold_tuning()
         self._print_report()
         return self.metrics
 
@@ -78,12 +89,20 @@ class AlphaLocalTest:
         )
         logger.info(f"Known: {self.metrics.known_photos}, Unknown: {self.metrics.unknown_photos}")
 
+    def _run_archive_doctor(self) -> None:
+        logger.info("=== Archive Doctor ===")
+        doctor = ArchiveDoctor()
+        report = doctor.check(self.known_path)
+        if not report.is_healthy:
+            self.metrics.errors += 1
+
     def _run_import(self) -> None:
         logger.info("=== Import Known ===")
         t0 = time.perf_counter()
         builder = ArchiveBuilder(
             known_path=self.known_path,
             workspace_path=self.workspace_path,
+            limit=self.limit,
         )
         try:
             result = builder.run()
@@ -126,6 +145,43 @@ class AlphaLocalTest:
         logger.info(f"Processed: {len(unknown_files)}, No face: {self.metrics.no_face}, Errors: {self.metrics.errors}")
         logger.info(f"Avg search: {self.metrics.avg_search_ms:.1f}ms, Total: {self.metrics.search_time_s:.1f}s")
 
+    def _run_validation(self, limit: int | None = 50) -> None:
+        logger.info("=== Validation ===")
+        config = ConfigManager.get_instance()
+        engine = RecognitionEngine(config)
+        faiss = FaissIndex(dimension=512)
+        index_path = self.workspace_path / "faiss.index"
+        id_map_path = self.workspace_path / "faiss_id_map.json"
+        if index_path.exists() and id_map_path.exists():
+            try:
+                faiss.load(str(index_path), str(id_map_path))
+                logger.info(f"Faiss loaded: {faiss.total_vectors} vectors, metric={getattr(faiss, 'metric', 'l2')}")
+            except Exception as exc:
+                logger.warning(f"Cannot load Faiss: {exc}")
+        else:
+            logger.warning("Faiss index not found, validation skipped")
+            return
+        validator = RecognitionValidator(engine=engine, faiss=faiss, top_k=10)
+        report = validator.validate_unknown_folder(self.unknown_path, limit=limit)
+        self._last_validation_report = report.__dict__
+        self.metrics.validation_found = report.found
+        self.metrics.validation_not_found = report.not_found
+        self.metrics.validation_avg_top1_distance = report.avg_top1_distance
+
+    def _run_threshold_tuning(self) -> None:
+        logger.info("=== Threshold Tuning ===")
+        distances = [
+            r.top1_distance
+            for r in getattr(self, '_last_validation_report', {}).get('all_results', [])
+            if r.top1_distance is not None
+        ]
+        if not distances:
+            logger.info("No distances for tuning")
+            return
+        tuner = ThresholdTuner(distances)
+        rec = tuner.recommend()
+        tuner.print_recommendation(rec)
+
     def _print_report(self) -> None:
         print("\n" + "=" * 60)
         print("ALPHA 0.1 TEST REPORT")
@@ -137,6 +193,9 @@ class AlphaLocalTest:
         print(f"Avg search: {self.metrics.avg_search_ms:.1f}ms" if getattr(self, '_search_times', []) else "Avg search: n/a (no matches)")
         print(f"No face: {self.metrics.no_face}")
         print(f"Errors: {self.metrics.errors}")
+        print(f"Validation found: {self.metrics.validation_found}")
+        print(f"Validation not found: {self.metrics.validation_not_found}")
+        print(f"Validation avg Top1 distance: {self.metrics.validation_avg_top1_distance:.4f}")
         print("=" * 60 + "\n")
 
 
@@ -145,12 +204,14 @@ def main() -> None:
     parser.add_argument("--known", type=str, default=r"D:\Base", help="Path to known persons")
     parser.add_argument("--unknown", type=str, default=r"D:\Base\x", help="Path to unknown photos")
     parser.add_argument("--workspace", type=str, default=r"D:\FaceEngine_Test\Workspace", help="Workspace path")
+    parser.add_argument("--limit", type=int, default=None, help="Limit photos for import/validation")
     args = parser.parse_args()
 
     test = AlphaLocalTest(
         known_path=Path(args.known),
         unknown_path=Path(args.unknown),
         workspace_path=Path(args.workspace),
+        limit=args.limit,
     )
     test.run()
 

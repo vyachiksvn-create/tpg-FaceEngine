@@ -47,11 +47,13 @@ class ArchiveBuilder:
         workspace_path: Path,
         event_bus: EventBus | None = None,
         progress_callback: Callable[[float, str], None] | None = None,
+        limit: int | None = None,
     ) -> None:
         self.known_path = Path(known_path)
         self.workspace_path = Path(workspace_path)
         self.event_bus = event_bus
         self.progress_callback = progress_callback
+        self.limit = limit
         self.result = ArchiveBuildResult()
         self.reject_manager = RejectManager()
         self.report = ArchiveReport()
@@ -89,7 +91,7 @@ class ArchiveBuilder:
         recognition.load_model()
 
         faiss = FaissIndex(dimension=512)
-        faiss.create_index("flat")
+        faiss.create_index("flat", metric="ip")
 
         photo_files = [
             p
@@ -97,6 +99,8 @@ class ArchiveBuilder:
             for p in d.rglob("*")
             if p.is_file() and p.suffix.lower() in {".jpg", ".jpeg", ".png", ".bmp", ".webp"}
         ]
+        if self.limit:
+            photo_files = photo_files[: self.limit]
         self.result.total_photos = len(photo_files)
         self.report.photos_total = len(photo_files)
         self.benchmark.build.photos_total = len(photo_files)
@@ -147,6 +151,14 @@ class ArchiveBuilder:
         self.result.report = self.report
         self.report.print()
         self.benchmark.print_report()
+
+        try:
+            index_path = self.workspace_path / "faiss.index"
+            id_map_path = self.workspace_path / "faiss_id_map.json"
+            faiss.save(str(index_path), str(id_map_path))
+            logger.info(f"Faiss saved: {index_path}")
+        except Exception as exc:
+            logger.warning(f"Cannot save Faiss: {exc}")
 
         logger.info(
             f"ArchiveBuilder finished: persons={self.result.total_persons}, "
